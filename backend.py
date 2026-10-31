@@ -78,9 +78,10 @@ from langchain_groq import ChatGroq
 # -------------------- LLM Setup --------------------
 # Option 1: Groq (Recommended)
 
+groq_model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 llm = ChatGroq(
     api_key=os.getenv("GROQ_API_KEY"),
-    model="openai/gpt-oss-120b",
+    model=groq_model,
     temperature=0.7,
     # You can optionally include other kwargs like timeout or max_retries.
 )
@@ -112,7 +113,10 @@ def retrieve_context(query: str) -> str:
         return ""
     
     try:
-        docs = retriever.get_relevant_documents(query)
+        if hasattr(retriever, "invoke"):
+            docs = retriever.invoke(query)
+        else:
+            docs = retriever.get_relevant_documents(query)
         return "\n\n".join([doc.page_content for doc in docs])
     except Exception as e:
         logger.error(f"Error retrieving context: {e}")
@@ -226,15 +230,33 @@ async def voice_query(file: UploadFile = File(...), language: str = Form("Malaya
     """
     Accepts a voice query (audio file), transcribes it, and returns RAG chatbot answer.
     """
+    temp_audio_path = None
+    converted_path = None
     try:
+        suffix = os.path.splitext(file.filename)[1] if file.filename else ".wav"
+        if not suffix:
+            suffix = ".wav"
+
         # Save uploaded audio to temp file
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_audio:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_audio:
             shutil.copyfileobj(file.file, temp_audio)
             temp_audio_path = temp_audio.name
 
+        wav_path = temp_audio_path
+
+        # If incoming file is WebM/Opus or other compressed audio, convert to WAV using pydub if installed
+        try:
+            from pydub import AudioSegment
+            audio = AudioSegment.from_file(temp_audio_path)
+            converted_path = temp_audio_path + "_converted.wav"
+            audio.export(converted_path, format="wav")
+            wav_path = converted_path
+        except Exception as conv_err:
+            logger.warning(f"Audio conversion with pydub skipped or not available: {conv_err}. Proceeding with original file.")
+
         # Transcribe audio
         recognizer = sr.Recognizer()
-        with sr.AudioFile(temp_audio_path) as source:
+        with sr.AudioFile(wav_path) as source:
             audio_data = recognizer.record(source)
             # Use Malayalam or selected language
             lang_code = {
@@ -243,13 +265,9 @@ async def voice_query(file: UploadFile = File(...), language: str = Form("Malaya
             try:
                 query_text = recognizer.recognize_google(audio_data, language=lang_code)
             except Exception as e:
-                os.remove(temp_audio_path)
                 return {"answer": f"Could not transcribe audio: {str(e)}"}
 
-        os.remove(temp_audio_path)
-
         # Pass transcribed text to RAG chatbot
-        # Use a new thread for each voice query (or you can use session)
         thread_id = str(uuid.uuid4())
         messages = [HumanMessage(content=query_text)]
         CONFIG = {'configurable': {'thread_id': thread_id}}
@@ -259,6 +277,17 @@ async def voice_query(file: UploadFile = File(...), language: str = Form("Malaya
         return {"answer": answer, "transcription": query_text}
     except Exception as e:
         return {"answer": f"Voice query failed: {str(e)}"}
+    finally:
+        if temp_audio_path and os.path.exists(temp_audio_path):
+            try:
+                os.remove(temp_audio_path)
+            except Exception:
+                pass
+        if converted_path and os.path.exists(converted_path):
+            try:
+                os.remove(converted_path)
+            except Exception:
+                pass
 @app.get("/threads", response_model=ThreadListResponse)
 def get_all_threads():
     threads = retrieve_all_threads()
@@ -415,18 +444,32 @@ def get_processing_status():
 
 @app.post("/api/predict-disease/")
 async def predict_disease(file: UploadFile = File(...)):
+    temp_file = None
     try:
-        temp_file = f"temp_{file.filename}"
+        temp_file = f"temp_{uuid.uuid4().hex[:8]}_{file.filename}"
         with open(temp_file, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
         pipeline = PredictionPipeline(temp_file)
         result = pipeline.predict()
 
-        os.remove(temp_file)
         return {"prediction": result[0]["image"], "probabilities": result[0]["probabilities"]}
+    except FileNotFoundError as fnf:
+        logger.error(f"Model file missing: {fnf}")
+        return {
+            "prediction": "Model Unavailable",
+            "probabilities": [],
+            "error": "Crop disease classification model weights ('model/model8.keras') are not installed."
+        }
     except Exception as e:
+        logger.error(f"Disease prediction failed: {e}")
         return {"error": str(e)}
+    finally:
+        if temp_file and os.path.exists(temp_file):
+            try:
+                os.remove(temp_file)
+            except Exception:
+                pass
 
 # -------------------- Document Management Endpoints --------------------
 @app.post("/upload_document")

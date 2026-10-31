@@ -78,7 +78,7 @@ const DiseasePredictionPage = () => {
         </Card.Header>
         <Card.Content className="space-y-4">
           <Alert type="info">
-            Upload a medical image for AI-powered disease prediction
+            Upload a crop leaf image for AI-powered disease prediction
           </Alert>
           
           <div className="space-y-4">
@@ -96,7 +96,7 @@ const DiseasePredictionPage = () => {
               >
                 <Upload className="w-8 h-8 text-gray-400" />
                 <span className="text-sm text-gray-600">
-                  Choose a medical image
+                  Choose a crop leaf image
                 </span>
                 <span className="text-xs text-gray-400">
                   Supported formats: JPG, JPEG, PNG

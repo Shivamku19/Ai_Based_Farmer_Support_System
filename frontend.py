@@ -217,23 +217,23 @@ with tab1:
 
 # -------------------- Disease Prediction Tab --------------------
 with tab2:
-    st.header("🔬 Disease Prediction from Medical Images")
-    st.info("Upload a medical image for AI-powered disease prediction")
+    st.header("🔬 Crop Disease Detection from Leaf Images")
+    st.info("Upload a plant leaf photograph for AI-powered crop disease diagnosis")
     
     # Create two columns for upload and results
     upload_col, result_col = st.columns([1, 1])
     
     with upload_col:
-        st.subheader("Upload Image")
+        st.subheader("Upload Leaf Image")
         uploaded_file = st.file_uploader(
-            "Choose a medical image", 
+            "Choose a crop leaf image", 
             type=["jpg", "jpeg", "png"],
             help="Supported formats: JPG, JPEG, PNG"
         )
         
         if uploaded_file:
             # Display the uploaded image
-            st.image(uploaded_file, caption="Uploaded Image", use_column_width=True)
+            st.image(uploaded_file, caption="Uploaded Image", use_container_width=True)
             
             # Analyze button
             if st.button("🔍 Analyze Image", type="primary", use_container_width=True):
@@ -333,7 +333,62 @@ with tab2:
         else:
             st.info("Upload and analyze an image to see results here")
 
+# -------------------- Dashboard Tab --------------------
+with tab3:
+    st.header("📊 Knowledge Base & System Dashboard")
+    st.caption("Overview of indexed Kerala agricultural documents, vector chunks, and system health")
+    
+    status = get_processing_status()
+    docs = get_documents()
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Total Documents", status.get("total_documents", len(docs)))
+    with col2:
+        st.metric("Processed Chunks", status.get("processed_chunks", 0))
+    with col3:
+        has_chunks = status.get("processed_chunks", 0) > 0
+        st.metric("System Status", "🟢 Ready" if has_chunks else "🟠 Needs Sync")
+    
+    st.divider()
+    st.subheader("📚 Available Agricultural References")
+    if docs:
+        for doc in docs:
+            st.write(f"📄 **{doc}**")
+    else:
+        st.info("No documents currently loaded in knowledge base.")
+    
+    st.divider()
+    st.subheader("🔄 Knowledge Base Maintenance")
+    sync_col1, sync_col2 = st.columns(2)
+    with sync_col1:
+        if st.button("Sync Modified Documents", use_container_width=True):
+            with st.spinner("Syncing modified documents..."):
+                try:
+                    res = requests.post(f"{API_URL}/sync_documents", timeout=30)
+                    if res.status_code == 200:
+                        st.success(res.json().get("message", "Sync complete!"))
+                        st.cache_data.clear()
+                        st.rerun()
+                    else:
+                        st.error(f"Sync failed: {res.text}")
+                except Exception as e:
+                    st.error(f"Error connecting to backend: {e}")
+    with sync_col2:
+        if st.button("Reindex All Documents", use_container_width=True):
+            with st.spinner("Reindexing all documents..."):
+                try:
+                    res = requests.post(f"{API_URL}/reindex_documents", timeout=60)
+                    if res.status_code == 200:
+                        st.success(res.json().get("message", "Reindexing complete!"))
+                        st.cache_data.clear()
+                        st.rerun()
+                    else:
+                        st.error(f"Reindexing failed: {res.text}")
+                except Exception as e:
+                    st.error(f"Error connecting to backend: {e}")
+
 # Footer
 st.sidebar.divider()
 st.sidebar.caption("Built with LangGraph, RAG, and Streamlit")
-st.sidebar.caption("© 2024 Medical Assistant")
+st.sidebar.caption("© 2024 Digital Krishi Officer")

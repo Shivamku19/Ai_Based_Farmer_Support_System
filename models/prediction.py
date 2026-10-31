@@ -10,15 +10,24 @@ class PredictionPipeline:
         self.model_path = os.path.join("model", "model8.keras")  # <- your saved model
         self.class_indices_path = os.path.join("model", "class_indices.json")  # <- class mappings
 
+        if not os.path.exists(self.model_path):
+            raise FileNotFoundError(
+                f"Model weights file not found at '{self.model_path}'. "
+                "Please place 'model8.keras' inside the 'model' directory."
+            )
+
         # Load trained model
         self.model = load_model(self.model_path)
 
         # Load class indices
-        with open(self.class_indices_path, "r") as f:
-            self.class_indices = json.load(f)
-
-        # Reverse mapping {index: class_name}
-        self.class_labels = {v: k for k, v in self.class_indices.items()}
+        if os.path.exists(self.class_indices_path):
+            with open(self.class_indices_path, "r", encoding="utf-8") as f:
+                self.class_indices = json.load(f)
+            # Reverse mapping {index: class_name}
+            self.class_labels = {v: k for k, v in self.class_indices.items()}
+        else:
+            self.class_indices = {}
+            self.class_labels = {}
 
     def predict(self):
         # Preprocess image

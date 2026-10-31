@@ -8,11 +8,11 @@ def initialize_knowledge_base():
     # Create a sample document if the folder is empty
     if not os.listdir("documents"):
         sample_file = os.path.join("documents", "sample.txt")
-        with open(sample_file, "w") as f:
-            f.write("""Welcome to the Medical Chatbot Knowledge Base.
+        with open(sample_file, "w", encoding="utf-8") as f:
+            f.write("""Welcome to the Digital Krishi Officer Knowledge Base.
 
-This is a sample document. Please add your medical documents, research papers, 
-and other relevant materials to this folder.
+This is a sample document. Please add your agricultural documents, package of practices,
+crop advisory reports, and other relevant farming materials to this folder.
 
 Supported formats:
 - PDF (.pdf)
@@ -20,7 +20,7 @@ Supported formats:
 - Word documents (.doc, .docx)
 - Markdown files (.md)
 
-The chatbot will use these documents to provide informed responses to medical queries.
+The advisory system uses these documents to provide accurate responses to farming queries.
 """)
         print("Created sample document in documents folder")
     
